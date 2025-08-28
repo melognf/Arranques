@@ -4,38 +4,109 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Arranque — Operación (offline)</title>
+
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
 <style>
-:root{ --bg:#0b1020; --panel:#0f162e; --pri:#2563eb; --ok:#16a34a; --fail:#dc2626; --mut:#94a3b8;}
+:root{
+  --bg:#0b1020; --panel:#0f162e; --pri:#2563eb; --ok:#16a34a; --fail:#dc2626; --mut:#94a3b8;
+  --step-min-h:78px;
+}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:#e5e7eb;font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Ubuntu}
-.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#0a0f1f;border-bottom:1px solid #1f2937;}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;background:#0a0f1f;border-bottom:1px solid #1f2937;}
 h1{font-size:18px;margin:0}
-.wrap{max-width:1120px;margin:0 auto;padding:14px}
-section{background:var(--panel);border:1px solid #1f2937;border-radius:12px;padding:14px;margin:12px 0}
-.state{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+
+/* layout */
+.wrap{max-width:1280px;margin:0 auto;padding:26px}
+section{background:var(--panel);border:1px solid #1f2937;border-radius:12px;padding:20px;margin:18px 0}
+h3{margin:10px 0 14px}
+.state{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
 .badge{padding:4px 8px;border:1px solid #334155;border-radius:999px;background:rgba(37,99,235,.1)}
-.stepper{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
-.step{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #1f2937;border-radius:10px;background:#0b142a}
-.step .dot{width:10px;height:10px;border-radius:50%;background:#1f2937}
+
+/* ---------- STEPPER ---------- */
+.stepper{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:14px;
+}
+.step{
+  display:flex;gap:10px;align-items:center;
+  padding:16px;border:1px solid #1f2937;border-radius:12px;background:#0b142a;
+  min-height:var(--step-min-h);
+  line-height:1.2;
+}
+.step div:last-child{ font-size:12px; }
+.step .dot{width:10px;height:10px;border-radius:50%;background:#1f2937;flex:0 0 auto}
 .step.done .dot{background:var(--ok)}
-.step.active{outline:1px solid #334155;background:#0e1a36}
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.step.active{
+  border-color:var(--fail); background:#0d162f; position:relative;
+  animation:blink 1.15s ease-in-out infinite;
+  box-shadow:0 0 0 1px rgba(220,38,38,.5), 0 0 18px rgba(220,38,38,.25);
+}
+.step.active .dot{ background:var(--fail); box-shadow:0 0 0 6px rgba(220,38,38,.15); }
+.step.next{ border-color:rgba(37,99,235,.6); background:#0c1630; }
+.step.next .dot{ background:var(--pri); }
+@keyframes blink{
+  0%,100%{ box-shadow:0 0 0 1px rgba(220,38,38,.45), 0 0 10px rgba(220,38,38,.2); }
+  50%   { box-shadow:0 0 0 3px rgba(220,38,38,.9), 0 0 26px rgba(220,38,38,.35); }
+}
+
+/* ---------- BOTONES / FORMS ---------- */
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
 .btn{padding:8px 12px;border-radius:8px;border:1px solid #334155;background:#0e1a36;color:#e5e7eb;cursor:pointer}
 .btn:hover{filter:brightness(1.12)}
 .btn.primary{background:var(--pri)} .btn.warn{background:var(--fail);border-color:#7f1d1d}
 .btn.ghost{background:transparent}
-.note-row{margin:8px 0}
-.note-row input{width:100%;padding:8px;border:1px solid #334155;background:#0e1a36;color:#e5e7eb;border-radius:8px}
-.logs{display:flex;flex-direction:column;gap:6px}
-.log-item{display:flex;gap:10px;padding:8px;border:1px solid #1f2937;border-radius:8px;background:#0b142a}
+
+/* ---------- NOTAS ---------- */
+.note-row{margin:12px 0; display:flex; gap:10px; flex-wrap:wrap}
+.note-row textarea{
+  flex:1 1 360px;
+  width:100%;
+  padding:10px 12px;
+  border:1px solid #334155;
+  background:#0e1a36;
+  color:#e5e7eb;
+  border-radius:8px;
+  min-height:86px;
+  resize:vertical;
+}
+#notesList{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+.note-item{
+  display:flex; gap:10px; align-items:flex-start;
+  padding:10px; border:1px solid #1f2937; border-radius:8px; background:#0b142a;
+}
+.note-item time{ opacity:.75; font-size:12px; min-width:160px; }
+.note-item .note-meta{opacity:.9; font-size:12px}
+.note-item .note-txt{white-space:pre-wrap}
+.note-item .del{ margin-left:auto; background:#1a223f; border:1px solid #374151; padding:4px 8px; border-radius:6px; cursor:pointer; }
+
+/* ---------- HISTORIAL ---------- */
+.logs{display:flex;flex-direction:column;gap:8px}
+.log-item{display:flex;gap:10px;padding:10px;border:1px solid #1f2937;border-radius:8px;background:#0b142a}
 .log-item time{opacity:.75;font-size:12px;min-width:160px}
-.chartbox{overflow-x:auto;background:#0b142a;border:1px solid #1f2937;border-radius:10px;padding:8px}
-.aux{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+
+/* ---------- CHART ---------- */
+.chartbox{overflow-x:auto;background:#0b142a;border:1px solid #1f2937;border-radius:10px;padding:12px}
+.aux{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 small.muted{color:var(--mut)}
-hr.sep{border:none;border-top:1px dashed #334155;margin:10px 0}
+hr.sep{border:none;border-top:1px dashed #334155;margin:16px 0}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 900px){ .stepper{ grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (max-width: 640px){
+  .stepper{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .step{ padding:12px; }
+  .log-item time, .note-item time{ min-width:130px; }
+  h1{font-size:16px}
+}
+@media (max-width: 360px){
+  .step{ padding:10px; }
+  .step div:last-child{ font-size:12px }
+}
 </style>
 </head>
 <body>
@@ -56,9 +127,12 @@ hr.sep{border:none;border-top:1px dashed #334155;margin:10px 0}
 
     <div class="actions" id="actions"></div>
 
+    <!-- Bloc de notas -->
     <div class="note-row">
-      <input id="nota" type="text" placeholder="Nota opcional…">
+      <textarea id="nota" placeholder="Escribí una anotación y tocá ‘Agregar nota’. Cada nota queda guardada con fecha/hora y el paso actual."></textarea>
+      <button id="btnAddNote" class="btn primary">Agregar nota</button>
     </div>
+    <div id="notesList"></div>
 
     <div class="aux">
       <button id="btnAbort" class="btn warn">Abortar ciclo (volver al inicio)</button>
@@ -107,10 +181,13 @@ const ORDER = STEPS.map(s=>s.key);
 const LABEL = k => (STEPS.find(s=>s.key===k)?.label)||k;
 const NEXT  = k => { const i=ORDER.indexOf(k); return (i>=0 && i<ORDER.length-1) ? ORDER[i+1] : null; };
 
+const START = '__start__';
+
 /* ====== Estado local ====== */
-const KEY = 'arranque_offline_v1';
-let state = { cycle:1, current: ORDER[0], updatedAt: new Date().toISOString() };
-let logs  = []; // {ts, from, to, note, cycle}
+const KEY = 'arranque_offline_final_pdf_robusto';
+let state = { cycle:1, current: START, updatedAt: new Date().toISOString() };
+let logs  = [];   // movimientos del flujo
+let notes = [];   // {id, ts, text, step, cycle}
 
 function loadLocal(){
   try{
@@ -119,10 +196,11 @@ function loadLocal(){
     const obj = JSON.parse(raw);
     state = obj.state||state;
     logs  = obj.logs||[];
+    notes = obj.notes||[];
   }catch{}
 }
 function saveLocal(){
-  localStorage.setItem(KEY, JSON.stringify({state, logs}));
+  localStorage.setItem(KEY, JSON.stringify({state, logs, notes}));
   document.getElementById('savedHint').textContent = 'guardado local';
 }
 
@@ -132,121 +210,201 @@ const cicloLabel  = document.getElementById('cicloLabel');
 const stepperBox  = document.getElementById('stepper');
 const actionsBox  = document.getElementById('actions');
 const notaInput   = document.getElementById('nota');
+const notesList   = document.getElementById('notesList');
 const logList     = document.getElementById('logList');
 const chartCanvas = document.getElementById('chartCycle');
 const lastSync    = document.getElementById('lastSync');
+
 document.getElementById('btnAbort').onclick = abortCycle;
 document.getElementById('btnReset').onclick = resetAll;
 document.getElementById('btnRefresh').onclick = render;
 document.getElementById('btnPdf').onclick = async()=> {
+  await waitFrames(2);
   const blob = await buildPdfBlob();
   downloadBlob(blob, reportName()+'.pdf');
 };
 document.getElementById('btnShare').onclick = shareWhatsapp;
+document.getElementById('btnAddNote').onclick = addNote;
 
 /* ====== Render ====== */
-let chart=null;
+let chart=null;           // también la exponemos global para el snapshot
+function LABEL_ANY(k){ return k===START ? 'INICIO' : LABEL(k); }
 function render(){
-  estadoLabel.textContent = LABEL(state.current);
+  estadoLabel.textContent = (state.current===START) ? 'INICIO (pendiente: SACAR TAPAS)' : LABEL(state.current);
   cicloLabel.textContent  = 'Ciclo ' + state.cycle;
   renderStepper();
   renderActions();
   renderLogs();
+  renderNotes();
   drawChartFromLogs(currentCycleLogs());
+  uniformStepHeights();
   lastSync.textContent = 'Última act.: ' + fmt(new Date());
 }
+
+/* Stepper */
 function renderStepper(){
-  const curIdx = ORDER.indexOf(state.current);
   stepperBox.innerHTML = '';
+  const curIdx = (state.current===START) ? -1 : ORDER.indexOf(state.current);
   STEPS.forEach((s, idx)=>{
+    let cls = 'step';
+    if (idx < curIdx) cls += ' done';
+    if (idx === curIdx) cls += ' active';
+    if (state.current===START && idx===0) cls += ' next';
     const el = document.createElement('div');
-    el.className='step'+(idx<curIdx?' done':'')+(idx===curIdx?' active':'');
-    el.innerHTML=`<div class="dot"></div><div style="font-size:12px">${idx+1}. ${s.label}</div>`;
+    el.className = cls;
+    el.innerHTML=`<div class="dot"></div><div>${idx+1}. ${s.label}</div>`;
     stepperBox.appendChild(el);
   });
+  uniformStepHeights();
 }
+
+/* Acciones */
 function renderActions(){
   actionsBox.innerHTML='';
-  const next = NEXT(state.current);
-  if(next){
+  if(state.current===START){
     const b=document.createElement('button');
     b.className='btn primary';
-    b.textContent = LABEL(next);
-    b.onclick = ()=>apply(next, LABEL(next));
+    b.textContent = LABEL(ORDER[0]);
+    b.onclick = ()=>apply(ORDER[0], 'Iniciar: ' + LABEL(ORDER[0]));
     actionsBox.appendChild(b);
-  }
-  if(state.current!==ORDER[0]){
+  }else{
+    const next = NEXT(state.current);
+    if(next){
+      const b=document.createElement('button');
+      b.className='btn primary';
+      b.textContent = LABEL(next);
+      b.onclick = ()=>apply(next, LABEL(next));
+      actionsBox.appendChild(b);
+    }
     const back=document.createElement('button');
     back.className='btn';
     back.textContent='Reiniciar al inicio';
-    back.onclick = ()=>apply(ORDER[0],'Reiniciar al inicio');
+    back.onclick = ()=>apply(START,'Reiniciar al inicio');
     actionsBox.appendChild(back);
   }
 }
+
+/* Historial */
 function renderLogs(){
   const L = currentCycleLogs();
   logList.innerHTML='';
   if(!L.length){ const d=document.createElement('div'); d.style.opacity=.75; d.textContent='Sin movimientos aún.'; logList.appendChild(d); return; }
   for(const it of L){
     const row=document.createElement('div'); row.className='log-item';
-    row.innerHTML=`<time>${fmt(new Date(it.ts))}</time><div><strong>${it.action||'Paso'}</strong> · ${LABEL(it.from)} → <b>${LABEL(it.to)}</b>${it.note?(' · Nota: '+escapeHtml(it.note)) : ''}</div>`;
+    row.innerHTML=`<time>${fmt(new Date(it.ts))}</time><div><strong>${it.action||'Paso'}</strong> · ${LABEL_ANY(it.from)} → <b>${LABEL_ANY(it.to)}</b>${it.note?(' · Nota: '+escapeHtml(it.note)) : ''}</div>`;
     logList.appendChild(row);
   }
 }
 
-/* ====== Util ====== */
+/* Notas */
+function addNote(){
+  const txt = (notaInput.value||'').trim();
+  if (!txt) return;
+  const it = {
+    id: String(Date.now()) + '-' + Math.random().toString(36).slice(2,7),
+    ts: new Date().toISOString(),
+    text: txt,
+    step: state.current,
+    cycle: state.cycle
+  };
+  notes.push(it);
+  notaInput.value = '';
+  saveLocal();
+  renderNotes();
+}
+function renderNotes(){
+  const list = notes.filter(n => n.cycle === state.cycle).sort((a,b)=> a.ts.localeCompare(b.ts));
+  notesList.innerHTML = '';
+  if(!list.length){
+    const d=document.createElement('div'); d.style.opacity=.75; d.textContent='Sin notas en este ciclo.'; notesList.appendChild(d); return;
+  }
+  for(const n of list){
+    const row = document.createElement('div');
+    row.className = 'note-item';
+    row.innerHTML = `
+      <time>${fmt(new Date(n.ts))}</time>
+      <div>
+        <div class="note-meta">Paso: <b>${LABEL_ANY(n.step)}</b></div>
+        <div class="note-txt">${escapeHtml(n.text)}</div>
+      </div>
+      <button class="del" title="Eliminar" aria-label="Eliminar">Borrar</button>
+    `;
+    row.querySelector('.del').onclick = ()=>{ deleteNote(n.id); };
+    notesList.appendChild(row);
+  }
+}
+function deleteNote(id){
+  notes = notes.filter(n => n.id !== id);
+  saveLocal();
+  renderNotes();
+}
+
+/* Util */
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[m]));}
 function fmt(d){return new Intl.DateTimeFormat('es-AR',{year:'2-digit',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(d);}
 function msToMin(ms){return Math.round((ms/60000)*100)/100;}
 function currentCycleLogs(){return logs.filter(l=>l.cycle===state.cycle).sort((a,b)=>a.ts.localeCompare(b.ts));}
+function currentCycleNotes(){return notes.filter(n=>n.cycle===state.cycle).sort((a,b)=>a.ts.localeCompare(b.ts));}
 function reportName(){return `arranque_ciclo-${state.cycle}_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}`;}
+const waitFrame = () => new Promise(r => requestAnimationFrame(r));
+async function waitFrames(n=2){ for (let i=0;i<n;i++) await waitFrame(); }
 
-/* ====== Acciones ====== */
+function uniformStepHeights(){
+  const cards = document.querySelectorAll('.stepper .step');
+  if (!cards.length) return;
+  cards.forEach(c => { c.style.height = ''; });
+  let max = 0; cards.forEach(c => { max = Math.max(max, c.offsetHeight); });
+  cards.forEach(c => { c.style.height = max + 'px'; });
+}
+function debounce(fn, ms=140){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+window.addEventListener('resize', debounce(uniformStepHeights, 140));
+
+/* Transiciones */
 async function apply(to, actionLabel){
   const from = state.current;
   const iFrom = ORDER.indexOf(from), iTo = ORDER.indexOf(to);
-  const allowed = (iTo===iFrom+1) || (to===ORDER[0] && from!==ORDER[0]);
+  const allowed =
+    (from===START && to===ORDER[0]) ||
+    (iTo === iFrom+1) ||
+    (to===START && from!==START);
   if(!allowed) return alert('Transición no permitida');
 
-  if(to===ORDER[0] && from==='produccion_ok') state.cycle += 1;
+  // Reinicio: el evento pertenece al ciclo que termina
+  if (to===START && from!==START){
+    logs.push({ ts:new Date().toISOString(), from, to: START, action: actionLabel||'Reiniciar al inicio', note:'', cycle: state.cycle });
+    state.cycle += 1;
+    state.current = START; state.updatedAt = new Date().toISOString();
+    saveLocal(); render(); return;
+  }
 
   state.current = to;
   state.updatedAt = new Date().toISOString();
-  logs.push({
-    ts: new Date().toISOString(),
-    from, to,
-    action: actionLabel||'',
-    note: (notaInput.value||'').trim(),
-    cycle: state.cycle
-  });
-  notaInput.value='';
+  logs.push({ ts:new Date().toISOString(), from, to, action: actionLabel||'', note:'', cycle: state.cycle });
   saveLocal(); render();
 
   if(to==='produccion_ok'){
-    // generar PDF y ofrecer compartir
+    await waitFrames(2);
     const blob = await buildPdfBlob();
-    // descarga inmediata (por si desktop)
     downloadBlob(blob, reportName()+'.pdf');
-    // intentar compartir en móvil
     try{ await shareWhatsapp(blob); }catch{}
   }
 }
 
 function abortCycle(){
   const mot = prompt('⚠️ Abortás el ciclo actual y volvés al inicio.\nMotivo (opcional):') ?? '';
-  logs.push({ ts:new Date().toISOString(), from: state.current, to: ORDER[0], action:'Abortar ciclo', note: mot, cycle: state.cycle+1 });
-  state.cycle += 1; state.current = ORDER[0]; state.updatedAt = new Date().toISOString();
+  logs.push({ ts:new Date().toISOString(), from: state.current, to: START, action:'Abortar ciclo', note: mot, cycle: state.cycle });
+  state.cycle += 1; state.current = START; state.updatedAt = new Date().toISOString();
   saveLocal(); render();
 }
 function resetAll(){
-  const ok = confirm('Esto borra TODOS los datos locales (historial y estado). ¿Continuar?');
+  const ok = confirm('Esto borra TODOS los datos locales (historial, notas y estado). ¿Continuar?');
   if(!ok) return;
-  state = { cycle:1, current: ORDER[0], updatedAt: new Date().toISOString() };
-  logs = [];
+  state = { cycle:1, current: START, updatedAt: new Date().toISOString() };
+  logs = []; notes = [];
   saveLocal(); render();
 }
 
-/* ====== Timeline / Summary ====== */
+/* Summary + Chart */
 function buildSummaryFromLogs(logs, cycleId){
   const PAIRS = [
     ['sacar_tapas','sin_tapas','Sacar tapas','#7c3aed'],
@@ -282,103 +440,258 @@ function buildSummaryFromLogs(logs, cycleId){
 }
 
 function drawChartFromLogs(logs){
-  if (!logs.length){ if(chart){chart.destroy(); chart=null;} return; }
+  if (!logs.length){
+    if(chart){ chart.destroy(); chart = null; }
+    return;
+  }
   const summary = buildSummaryFromLogs(logs, state.cycle);
-  if(chart){ chart.destroy(); chart=null; }
-  let totalSpanMin = summary.segments?.length ? Math.max(...summary.segments.map(s=>Number(s.endMin)||0)) : summary.pairs.reduce((a,p)=> a + (Number(p.min)||0), 0);
-  chartCanvas.style.width = Math.max(700, Math.ceil(totalSpanMin*50)) + 'px';
-  const labels = Array.from(new Set(summary.segments.map(s=>s.label)));
-  const datasets = summary.segments.map(seg=>({
-    label: seg.label, stack:'timeline',
-    data: labels.map(lbl => lbl===seg.label ? [Number(seg.startMin)||0, Number(seg.endMin)||0] : null),
-    backgroundColor: seg.color||'#999', borderColor: seg.color||'#999',
-    borderWidth:0, borderSkipped:false, barPercentage:1, categoryPercentage:1
-  }));
+
+  if(chart){ chart.destroy(); chart = null; }
+
+  const totalSpanMin = summary.segments?.length
+    ? Math.max(...summary.segments.map(s => Number(s.endMin) || 0))
+    : summary.pairs.reduce((acc,p)=> acc + (Number(p.min)||0), 0);
+  chartCanvas.style.width = Math.max(700, Math.ceil(totalSpanMin * 50)) + 'px';
+
+  let labels, datasets;
+
+  if (summary.segments?.length){
+    labels = Array.from(new Set(summary.segments.map(s => s.label)));
+    const rows = Math.max(1, labels.length);
+    const rowHeight = 34;
+    const minH = 220, maxH = 520;
+    chartCanvas.style.height = Math.max(minH, Math.min(maxH, rows * rowHeight + 24)) + 'px';
+
+    datasets = summary.segments.map(seg => ({
+      label: seg.label,
+      stack: 'timeline',
+      data: labels.map(lbl => lbl === seg.label
+        ? [Number(seg.startMin)||0, Number(seg.endMin)||0]
+        : null),
+      backgroundColor: seg.color || '#999',
+      borderColor: seg.color || '#999',
+      borderWidth: 0,
+      borderSkipped: false,
+      barPercentage: 1,
+      categoryPercentage: 1
+    }));
+  } else {
+    labels = summary.pairs.filter(p => (p.min||0) > 0).map(p => p.label);
+    const rows = Math.max(1, labels.length);
+    const rowHeight = 28;
+    const minH = 200, maxH = 520;
+    chartCanvas.style.height = Math.max(minH, Math.min(maxH, rows * rowHeight + 24)) + 'px';
+
+    datasets = [{
+      label: `Duración por tarea (ciclo ${state.cycle})`,
+      data: summary.pairs.map(p => p.min || 0)
+    }];
+  }
+
   chart = new Chart(chartCanvas.getContext('2d'), {
-    type:'bar', data:{ labels, datasets },
-    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      scales:{ y:{ stacked:true }, x:{ beginAtZero:true, min:0, suggestedMax: Math.max(0, Math.ceil(totalSpanMin*1.05)), title:{display:true,text:'min desde inicio del ciclo', color:'#e5e7eb'} },
-      }, plugins:{ legend:{display:false} } }
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { stacked: true },
+        x: {
+          beginAtZero: true,
+          min: 0,
+          suggestedMax: Math.max(0, Math.ceil(totalSpanMin * 1.05)),
+          title: { display: true, text: 'min desde inicio del ciclo', color:'#e5e7eb' }
+        }
+      },
+      plugins: { legend: { display: false } }
+    }
   });
+
+  // exponer para el snapshot
+  window.chart = chart;
 }
 
-/* ====== PDF ====== */
+/* === Snapshot robusto del gráfico para PDF === */
+const DPR = Math.max(2, window.devicePixelRatio || 1);
+async function captureChartPNG(){
+  const c = document.getElementById('chartCycle');
+  if (!c) return null;
+
+  if (!c.offsetWidth || !c.offsetHeight){
+    c.style.width  ||= '900px';
+    c.style.height ||= '260px';
+    await waitFrames(2);
+  }
+
+  if (window.chart && typeof window.chart.update === 'function'){
+    window.chart.update('none');
+  }
+  await waitFrames(2);
+
+  const rect = c.getBoundingClientRect();
+  const w = Math.max(c.width,  Math.round(rect.width  * DPR));
+  const h = Math.max(c.height, Math.round(rect.height * DPR));
+  if (w === 0 || h === 0) return null;
+
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  const ctx = tmp.getContext('2d');
+  ctx.fillStyle = '#0b1020';
+  ctx.fillRect(0,0,w,h);
+  ctx.drawImage(c, 0, 0, w, h);
+  return tmp.toDataURL('image/png');
+}
+
+/* ====== PDF (2 hojas: eventos+tabla+notas / timeline compacto) ====== */
 async function buildPdfBlob(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'a4' });
-  const margin = 36, lineH = 16;
-  let y = margin;
+
+  const A4_W = doc.internal.pageSize.getWidth();
+  const A4_H = doc.internal.pageSize.getHeight();
+  const MARGIN = 48;
+  const CONTENT_W = A4_W - MARGIN*2;
+  const BOTTOM   = A4_H - MARGIN;
+  const LH = 16;
+  let y = MARGIN;
+
+  const ensureSpace = (need=0) => { if (y + need > BOTTOM) { doc.addPage(); y = MARGIN; } };
+  const divider = (gapBefore=16, gapAfter=18) => {
+    y += gapBefore;
+    doc.setDrawColor(80); doc.setLineWidth(0.9);
+    doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
+    y += gapAfter;
+  };
+  const sectionTitle = (txt) => {
+    ensureSpace(LH*2);
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text(txt, MARGIN, y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    y += LH;
+  };
 
   const summary = buildSummaryFromLogs(currentCycleLogs(), state.cycle);
 
+  // ===== HOJA 1 =====
   doc.setFont('helvetica','bold'); doc.setFontSize(14);
-  doc.text('Reporte de Arranque', margin, y); y += lineH;
+  doc.text('Reporte de Arranque', MARGIN, y); y += LH;
   doc.setFont('helvetica','normal'); doc.setFontSize(11);
-  doc.text(`Ciclo: ${state.cycle}`, margin, y); y += lineH;
-  if(summary.startedAt) doc.text(`Inicio: ${fmt(new Date(summary.startedAt))}`, margin, y), y += lineH;
-  if(summary.finishedAt) doc.text(`Fin:    ${fmt(new Date(summary.finishedAt))}`, margin, y), y += lineH;
-  doc.text(`Duración total (estimada): ${summary.totalMin} min`, margin, y); y += lineH*1.3;
+  doc.text(`Ciclo: ${state.cycle}`, MARGIN, y); y += LH;
+  if (summary.startedAt) doc.text(`Inicio: ${fmt(new Date(summary.startedAt))}`, MARGIN, y), y += LH;
+  if (summary.finishedAt) doc.text(`Fin:    ${fmt(new Date(summary.finishedAt))}`,  MARGIN, y), y += LH;
+  doc.text(`Duración total (estimada): ${summary.totalMin.toFixed(2)} min`, MARGIN, y);
+  y += LH;
 
-  // Tabla simple de pasos y horarios
+  // Eventos
+  divider(12, 14);
+  sectionTitle('Eventos');
   const L = currentCycleLogs();
-  doc.setFont('helvetica','bold'); doc.text('Eventos', margin, y); y+= lineH;
-  doc.setFont('helvetica','normal');
-  const col2 = margin + 200;
-  for(const it of L){
-    if (y > 760){ doc.addPage(); y = margin; }
-    doc.text(`${fmt(new Date(it.ts))}`, margin, y);
-    doc.text(`${LABEL(it.to)}${it.note?(' — '+it.note):''}`, col2, y);
-    y += lineH;
+  const col2 = MARGIN + 220;
+  for (const it of L){
+    ensureSpace(LH * 1.4);
+    doc.text(`${fmt(new Date(it.ts))}`, MARGIN, y);
+    doc.text(`${LABEL_ANY(it.to)}${it.note?(' — '+it.note):''}`, col2, y);
+    y += LH;
   }
 
-  // Gráfico como imagen
-  if (chartCanvas){
-    const rect = chartCanvas.getBoundingClientRect();
-    const tmp = document.createElement('canvas');
-    tmp.width  = Math.max(chartCanvas.width,  Math.round(rect.width*2));
-    tmp.height = Math.max(chartCanvas.height, Math.round(rect.height*2));
-    const ctx = tmp.getContext('2d');
-    ctx.fillStyle='#0b1020'; ctx.fillRect(0,0,tmp.width,tmp.height);
-    ctx.drawImage(chartCanvas,0,0,tmp.width,tmp.height);
-    const img = tmp.toDataURL('image/png');
-    doc.addPage();
-    doc.text('Timeline', margin, margin);
-    const w = 520, h = w * (tmp.height/tmp.width);
-    doc.addImage(img, 'PNG', margin, margin+10, w, h);
+  // Duración por paso
+  divider(18, 14);
+  sectionTitle('Duración por paso (min)');
+  const rowH = 20;
+  ensureSpace(rowH * (summary.pairs.length + 2));
+  doc.setDrawColor(140); doc.setLineWidth(0.8);
+  doc.rect(MARGIN, y, CONTENT_W, rowH);
+  doc.text('Paso',    MARGIN + 6,              y + 14);
+  doc.text('Minutos', MARGIN + CONTENT_W - 6,  y + 14, { align:'right' });
+  let yy = y + rowH;
+  doc.setFont('helvetica','normal');
+  for (const p of summary.pairs){
+    ensureSpace(rowH);
+    doc.rect(MARGIN, yy, CONTENT_W, rowH);
+    doc.text(p.label, MARGIN + 6, yy + 14);
+    doc.text(String((p.min||0).toFixed(2)), MARGIN + CONTENT_W - 6, yy + 14, { align:'right' });
+    yy += rowH;
+  }
+  doc.setFont('helvetica','bold');
+  doc.rect(MARGIN, yy, CONTENT_W, rowH);
+  doc.text('TOTAL', MARGIN + 6, yy + 14);
+  doc.text(String((summary.totalMin||0).toFixed(2)), MARGIN + CONTENT_W - 6, yy + 14, { align:'right' });
+  y = yy + rowH;
+
+  // Notas
+  divider(18, 14);
+  sectionTitle('Notas');
+  const NL = currentCycleNotes ? currentCycleNotes() : [];
+  if (!NL.length){
+    ensureSpace(LH); doc.text('— Sin notas —', MARGIN, y); y += LH;
+  } else {
+    for (const n of NL){
+      const head = `${fmt(new Date(n.ts))} · ${LABEL_ANY(n.step)}:`;
+      const wrap = doc.splitTextToSize(n.text, CONTENT_W - 16);
+      ensureSpace(LH + wrap.length*LH + 6);
+      doc.text(head, MARGIN, y); y += LH;
+      doc.text(wrap, MARGIN + 16, y); y += wrap.length*LH + 6;
+    }
+  }
+
+  // ===== HOJA 2 — Timeline compacto arriba =====
+  doc.addPage();
+  let y2 = MARGIN + 6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text('Timeline', MARGIN, y2);
+  y2 += 10;
+  doc.setDrawColor(100); doc.setLineWidth(0.6);
+  doc.line(MARGIN, y2, MARGIN + CONTENT_W, y2);
+  y2 += 8;
+
+  await waitFrames(2);
+  const img = await captureChartPNG();
+
+  if (img){
+    const availableH = (A4_H - MARGIN) - y2;
+    const probe = await new Promise(res=>{
+      const im = new Image();
+      im.onload = ()=>res(im);
+      im.src = img;
+    });
+    let w = CONTENT_W;
+    let h = w * (probe.naturalHeight / probe.naturalWidth);
+    if (h > availableH){
+      const k = availableH / h;
+      h = availableH;
+      w = w * k;
+    }
+    doc.addImage(img, 'PNG', MARGIN, y2, w, h, undefined, 'FAST');
+  } else {
+    doc.setFont('helvetica','italic');
+    doc.text('No se pudo capturar el gráfico (canvas no disponible).', MARGIN, y2);
   }
 
   return doc.output('blob');
 }
 
+/* Descarga / Share */
 function downloadBlob(blob, filename){
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
   setTimeout(()=> URL.revokeObjectURL(url), 2000);
 }
-
-/* ====== Compartir por WhatsApp ====== */
 async function shareWhatsapp(optionalBlob){
   const blob = optionalBlob || await buildPdfBlob();
   const file = new File([blob], reportName()+'.pdf', { type:'application/pdf' });
-
   if (navigator.canShare && navigator.canShare({ files:[file] })){
-    await navigator.share({
-      files:[file],
-      title:'Reporte de Arranque',
-      text:`Adjunto reporte del ciclo ${state.cycle}.`
-    });
+    await navigator.share({ files:[file], title:'Reporte de Arranque', text:`Adjunto reporte del ciclo ${state.cycle}.` });
   } else {
-    // Fallback desktop / navegadores sin Web Share Level 2:
     downloadBlob(blob, reportName()+'.pdf');
     const msg = `Adjunto reporte del ciclo ${state.cycle}.`;
     const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
-    window.open(url, '_blank'); // el usuario adjunta el PDF descargado
+    window.open(url, '_blank');
     alert('Tu navegador no permite adjuntar el PDF directamente a WhatsApp.\nSe descargó el archivo y se abrió WhatsApp con el mensaje. Adjuntá el PDF manualmente.');
   }
 }
 
-/* ====== Arranque ====== */
+/* Arranque */
 loadLocal();
 render();
 </script>
