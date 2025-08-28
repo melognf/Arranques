@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Arranque — Operación (offline)</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+:root{ --bg:#0b1020; --panel:#0f162e; --pri:#2563eb; --ok:#16a34a; --fail:#dc2626; --mut:#94a3b8;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#e5e7eb;font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Ubuntu}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#0a0f1f;border-bottom:1px solid #1f2937;}
+h1{font-size:18px;margin:0}
+.wrap{max-width:1120px;margin:0 auto;padding:14px}
+section{background:var(--panel);border:1px solid #1f2937;border-radius:12px;padding:14px;margin:12px 0}
+.state{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.badge{padding:4px 8px;border:1px solid #334155;border-radius:999px;background:rgba(37,99,235,.1)}
+.stepper{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.step{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #1f2937;border-radius:10px;background:#0b142a}
+.step .dot{width:10px;height:10px;border-radius:50%;background:#1f2937}
+.step.done .dot{background:var(--ok)}
+.step.active{outline:1px solid #334155;background:#0e1a36}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.btn{padding:8px 12px;border-radius:8px;border:1px solid #334155;background:#0e1a36;color:#e5e7eb;cursor:pointer}
+.btn:hover{filter:brightness(1.12)}
+.btn.primary{background:var(--pri)} .btn.warn{background:var(--fail);border-color:#7f1d1d}
+.btn.ghost{background:transparent}
+.note-row{margin:8px 0}
+.note-row input{width:100%;padding:8px;border:1px solid #334155;background:#0e1a36;color:#e5e7eb;border-radius:8px}
+.logs{display:flex;flex-direction:column;gap:6px}
+.log-item{display:flex;gap:10px;padding:8px;border:1px solid #1f2937;border-radius:8px;background:#0b142a}
+.log-item time{opacity:.75;font-size:12px;min-width:160px}
+.chartbox{overflow-x:auto;background:#0b142a;border:1px solid #1f2937;border-radius:10px;padding:8px}
+.aux{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+small.muted{color:var(--mut)}
+hr.sep{border:none;border-top:1px dashed #334155;margin:10px 0}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1>Arranque — Operación (offline)</h1>
+  <div><small class="muted" id="savedHint">datos locales</small></div>
+</header>
+
+<main class="wrap">
+  <section>
+    <div class="state">
+      <div>Estado actual:</div>
+      <div id="estadoLabel" class="badge"></div>
+      <div id="cicloLabel" class="badge"></div>
+    </div>
+
+    <div id="stepper" class="stepper"></div>
+
+    <div class="actions" id="actions"></div>
+
+    <div class="note-row">
+      <input id="nota" type="text" placeholder="Nota opcional…">
+    </div>
+
+    <div class="aux">
+      <button id="btnAbort" class="btn warn">Abortar ciclo (volver al inicio)</button>
+      <button id="btnReset" class="btn ghost">Borrar TODO (datos locales)</button>
+      <button id="btnRefresh" class="btn">Actualizar</button>
+      <span class="muted" id="lastSync"></span>
+    </div>
+
+    <hr class="sep">
+
+    <div class="aux">
+      <button id="btnPdf" class="btn">Descargar PDF</button>
+      <button id="btnShare" class="btn primary">Compartir por WhatsApp</button>
+      <small class="muted">Al finalizar (PRODUCCIÓN OK) se genera el PDF automáticamente.</small>
+    </div>
+  </section>
+
+  <section>
+    <h3>Historial</h3>
+    <div id="logList" class="logs"></div>
+  </section>
+
+  <section>
+    <h3>Timeline del ciclo</h3>
+    <div class="chartbox"><canvas id="chartCycle" height="260"></canvas></div>
+  </section>
+</main>
+
+<script>
+/* ====== Pasos ====== */
+const STEPS = [
+  { key:'sacar_tapas',           label:'SACAR TAPAS' },
+  { key:'sin_tapas',             label:'SIN TAPAS (pedido de hisopado)' },
+  { key:'inicio_hisopado',       label:'INICIO HISOPADO' },
+  { key:'fin_hisopado',          label:'FIN DE HISOPADO (pedido de enfriamiento)' },
+  { key:'inicio_enfriamiento',   label:'INICIO DE ENFRIAMIENTO' },
+  { key:'fin_enfriamiento',      label:'FIN DE ENFRIAMIENTO' },
+  { key:'pedido_cargas',         label:'PEDIDO DE CARGAS' },
+  { key:'inicio_cargas',         label:'INICIO DE CARGAS' },
+  { key:'fin_cargas',            label:'FIN DE CARGAS' },
+  { key:'analisis_bebida',       label:'ANÁLISIS DE BEBIDA' },
+  { key:'bebida_ok',             label:'BEBIDA OK (primera lata)' },
+  { key:'produccion_ok',         label:'PRODUCCIÓN OK' }
+];
+const ORDER = STEPS.map(s=>s.key);
+const LABEL = k => (STEPS.find(s=>s.key===k)?.label)||k;
+const NEXT  = k => { const i=ORDER.indexOf(k); return (i>=0 && i<ORDER.length-1) ? ORDER[i+1] : null; };
+
+/* ====== Estado local ====== */
+const KEY = 'arranque_offline_v1';
+let state = { cycle:1, current: ORDER[0], updatedAt: new Date().toISOString() };
+let logs  = []; // {ts, from, to, note, cycle}
+
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return;
+    const obj = JSON.parse(raw);
+    state = obj.state||state;
+    logs  = obj.logs||[];
+  }catch{}
+}
+function saveLocal(){
+  localStorage.setItem(KEY, JSON.stringify({state, logs}));
+  document.getElementById('savedHint').textContent = 'guardado local';
+}
+
+/* ====== UI refs ====== */
+const estadoLabel = document.getElementById('estadoLabel');
+const cicloLabel  = document.getElementById('cicloLabel');
+const stepperBox  = document.getElementById('stepper');
+const actionsBox  = document.getElementById('actions');
+const notaInput   = document.getElementById('nota');
+const logList     = document.getElementById('logList');
+const chartCanvas = document.getElementById('chartCycle');
+const lastSync    = document.getElementById('lastSync');
+document.getElementById('btnAbort').onclick = abortCycle;
+document.getElementById('btnReset').onclick = resetAll;
+document.getElementById('btnRefresh').onclick = render;
+document.getElementById('btnPdf').onclick = async()=> {
+  const blob = await buildPdfBlob();
+  downloadBlob(blob, reportName()+'.pdf');
+};
+document.getElementById('btnShare').onclick = shareWhatsapp;
+
+/* ====== Render ====== */
+let chart=null;
+function render(){
+  estadoLabel.textContent = LABEL(state.current);
+  cicloLabel.textContent  = 'Ciclo ' + state.cycle;
+  renderStepper();
+  renderActions();
+  renderLogs();
+  drawChartFromLogs(currentCycleLogs());
+  lastSync.textContent = 'Última act.: ' + fmt(new Date());
+}
+function renderStepper(){
+  const curIdx = ORDER.indexOf(state.current);
+  stepperBox.innerHTML = '';
+  STEPS.forEach((s, idx)=>{
+    const el = document.createElement('div');
+    el.className='step'+(idx<curIdx?' done':'')+(idx===curIdx?' active':'');
+    el.innerHTML=`<div class="dot"></div><div style="font-size:12px">${idx+1}. ${s.label}</div>`;
+    stepperBox.appendChild(el);
+  });
+}
+function renderActions(){
+  actionsBox.innerHTML='';
+  const next = NEXT(state.current);
+  if(next){
+    const b=document.createElement('button');
+    b.className='btn primary';
+    b.textContent = LABEL(next);
+    b.onclick = ()=>apply(next, LABEL(next));
+    actionsBox.appendChild(b);
+  }
+  if(state.current!==ORDER[0]){
+    const back=document.createElement('button');
+    back.className='btn';
+    back.textContent='Reiniciar al inicio';
+    back.onclick = ()=>apply(ORDER[0],'Reiniciar al inicio');
+    actionsBox.appendChild(back);
+  }
+}
+function renderLogs(){
+  const L = currentCycleLogs();
+  logList.innerHTML='';
+  if(!L.length){ const d=document.createElement('div'); d.style.opacity=.75; d.textContent='Sin movimientos aún.'; logList.appendChild(d); return; }
+  for(const it of L){
+    const row=document.createElement('div'); row.className='log-item';
+    row.innerHTML=`<time>${fmt(new Date(it.ts))}</time><div><strong>${it.action||'Paso'}</strong> · ${LABEL(it.from)} → <b>${LABEL(it.to)}</b>${it.note?(' · Nota: '+escapeHtml(it.note)) : ''}</div>`;
+    logList.appendChild(row);
+  }
+}
+
+/* ====== Util ====== */
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[m]));}
+function fmt(d){return new Intl.DateTimeFormat('es-AR',{year:'2-digit',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(d);}
+function msToMin(ms){return Math.round((ms/60000)*100)/100;}
+function currentCycleLogs(){return logs.filter(l=>l.cycle===state.cycle).sort((a,b)=>a.ts.localeCompare(b.ts));}
+function reportName(){return `arranque_ciclo-${state.cycle}_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}`;}
+
+/* ====== Acciones ====== */
+async function apply(to, actionLabel){
+  const from = state.current;
+  const iFrom = ORDER.indexOf(from), iTo = ORDER.indexOf(to);
+  const allowed = (iTo===iFrom+1) || (to===ORDER[0] && from!==ORDER[0]);
+  if(!allowed) return alert('Transición no permitida');
+
+  if(to===ORDER[0] && from==='produccion_ok') state.cycle += 1;
+
+  state.current = to;
+  state.updatedAt = new Date().toISOString();
+  logs.push({
+    ts: new Date().toISOString(),
+    from, to,
+    action: actionLabel||'',
+    note: (notaInput.value||'').trim(),
+    cycle: state.cycle
+  });
+  notaInput.value='';
+  saveLocal(); render();
+
+  if(to==='produccion_ok'){
+    // generar PDF y ofrecer compartir
+    const blob = await buildPdfBlob();
+    // descarga inmediata (por si desktop)
+    downloadBlob(blob, reportName()+'.pdf');
+    // intentar compartir en móvil
+    try{ await shareWhatsapp(blob); }catch{}
+  }
+}
+
+function abortCycle(){
+  const mot = prompt('⚠️ Abortás el ciclo actual y volvés al inicio.\nMotivo (opcional):') ?? '';
+  logs.push({ ts:new Date().toISOString(), from: state.current, to: ORDER[0], action:'Abortar ciclo', note: mot, cycle: state.cycle+1 });
+  state.cycle += 1; state.current = ORDER[0]; state.updatedAt = new Date().toISOString();
+  saveLocal(); render();
+}
+function resetAll(){
+  const ok = confirm('Esto borra TODOS los datos locales (historial y estado). ¿Continuar?');
+  if(!ok) return;
+  state = { cycle:1, current: ORDER[0], updatedAt: new Date().toISOString() };
+  logs = [];
+  saveLocal(); render();
+}
+
+/* ====== Timeline / Summary ====== */
+function buildSummaryFromLogs(logs, cycleId){
+  const PAIRS = [
+    ['sacar_tapas','sin_tapas','Sacar tapas','#7c3aed'],
+    ['sin_tapas','inicio_hisopado','Demora inicio hisopado','#f59e0b'],
+    ['inicio_hisopado','fin_hisopado','Duración hisopado','#7c3aed'],
+    ['fin_hisopado','inicio_enfriamiento','Demora inicio enfriamiento','#f59e0b'],
+    ['inicio_enfriamiento','fin_enfriamiento','Duración enfriamiento','#7c3aed'],
+    ['fin_enfriamiento','pedido_cargas','Demora pedido de cargas','#f59e0b'],
+    ['pedido_cargas','inicio_cargas','Demora inicio cargas','#f59e0b'],
+    ['inicio_cargas','fin_cargas','Duración cargas','#7c3aed'],
+    ['fin_cargas','analisis_bebida','Demora análisis de bebida','#f59e0b'],
+    ['analisis_bebida','bebida_ok','Duración análisis','#7c3aed'],
+    ['bebida_ok','produccion_ok','Demora a producción','#f59e0b']
+  ];
+  logs=[...logs].sort((a,b)=>a.ts.localeCompare(b.ts));
+  if(!logs.length) return { cycle:cycleId,pairs:[],segments:[],totalMin:0,startedAt:null,finishedAt:null };
+  const firstFromIdx = logs.findIndex(lg => PAIRS.some(p => lg.to === p[0]));
+  const t0 = (firstFromIdx!==-1) ? new Date(logs[firstFromIdx].ts).getTime() : new Date(logs[0].ts).getTime();
+  const segments=[], accMs=new Array(PAIRS.length).fill(0), waiting=new Array(PAIRS.length).fill(null);
+  for(const lg of logs){
+    const t=new Date(lg.ts).getTime();
+    for(let i=0;i<PAIRS.length;i++){
+      const [from,to,label,color]=PAIRS[i];
+      if(lg.to===from){ waiting[i]=t; }
+      else if(lg.to===to && waiting[i]!=null){
+        const startMin=msToMin(waiting[i]-t0), endMin=msToMin(t-t0);
+        accMs[i]+=Math.max(0,t-waiting[i]); segments.push({key:`${from}->${to}`,label,startMin,endMin,color}); waiting[i]=null;
+      }
+    }
+  }
+  const pairs = PAIRS.map((p,i)=>({ key:`${p[0]}->${p[1]}`, label:p[2], ms:accMs[i], min:msToMin(accMs[i]) }));
+  return { cycle:cycleId, startedAt:logs[0]?.ts||null, finishedAt:logs[logs.length-1]?.ts||null, pairs, segments, totalMin: Math.round(pairs.reduce((a,b)=>a+(b.min||0),0)*100)/100 };
+}
+
+function drawChartFromLogs(logs){
+  if (!logs.length){ if(chart){chart.destroy(); chart=null;} return; }
+  const summary = buildSummaryFromLogs(logs, state.cycle);
+  if(chart){ chart.destroy(); chart=null; }
+  let totalSpanMin = summary.segments?.length ? Math.max(...summary.segments.map(s=>Number(s.endMin)||0)) : summary.pairs.reduce((a,p)=> a + (Number(p.min)||0), 0);
+  chartCanvas.style.width = Math.max(700, Math.ceil(totalSpanMin*50)) + 'px';
+  const labels = Array.from(new Set(summary.segments.map(s=>s.label)));
+  const datasets = summary.segments.map(seg=>({
+    label: seg.label, stack:'timeline',
+    data: labels.map(lbl => lbl===seg.label ? [Number(seg.startMin)||0, Number(seg.endMin)||0] : null),
+    backgroundColor: seg.color||'#999', borderColor: seg.color||'#999',
+    borderWidth:0, borderSkipped:false, barPercentage:1, categoryPercentage:1
+  }));
+  chart = new Chart(chartCanvas.getContext('2d'), {
+    type:'bar', data:{ labels, datasets },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ y:{ stacked:true }, x:{ beginAtZero:true, min:0, suggestedMax: Math.max(0, Math.ceil(totalSpanMin*1.05)), title:{display:true,text:'min desde inicio del ciclo', color:'#e5e7eb'} },
+      }, plugins:{ legend:{display:false} } }
+  });
+}
+
+/* ====== PDF ====== */
+async function buildPdfBlob(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const margin = 36, lineH = 16;
+  let y = margin;
+
+  const summary = buildSummaryFromLogs(currentCycleLogs(), state.cycle);
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('Reporte de Arranque', margin, y); y += lineH;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(`Ciclo: ${state.cycle}`, margin, y); y += lineH;
+  if(summary.startedAt) doc.text(`Inicio: ${fmt(new Date(summary.startedAt))}`, margin, y), y += lineH;
+  if(summary.finishedAt) doc.text(`Fin:    ${fmt(new Date(summary.finishedAt))}`, margin, y), y += lineH;
+  doc.text(`Duración total (estimada): ${summary.totalMin} min`, margin, y); y += lineH*1.3;
+
+  // Tabla simple de pasos y horarios
+  const L = currentCycleLogs();
+  doc.setFont('helvetica','bold'); doc.text('Eventos', margin, y); y+= lineH;
+  doc.setFont('helvetica','normal');
+  const col2 = margin + 200;
+  for(const it of L){
+    if (y > 760){ doc.addPage(); y = margin; }
+    doc.text(`${fmt(new Date(it.ts))}`, margin, y);
+    doc.text(`${LABEL(it.to)}${it.note?(' — '+it.note):''}`, col2, y);
+    y += lineH;
+  }
+
+  // Gráfico como imagen
+  if (chartCanvas){
+    const rect = chartCanvas.getBoundingClientRect();
+    const tmp = document.createElement('canvas');
+    tmp.width  = Math.max(chartCanvas.width,  Math.round(rect.width*2));
+    tmp.height = Math.max(chartCanvas.height, Math.round(rect.height*2));
+    const ctx = tmp.getContext('2d');
+    ctx.fillStyle='#0b1020'; ctx.fillRect(0,0,tmp.width,tmp.height);
+    ctx.drawImage(chartCanvas,0,0,tmp.width,tmp.height);
+    const img = tmp.toDataURL('image/png');
+    doc.addPage();
+    doc.text('Timeline', margin, margin);
+    const w = 520, h = w * (tmp.height/tmp.width);
+    doc.addImage(img, 'PNG', margin, margin+10, w, h);
+  }
+
+  return doc.output('blob');
+}
+
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(()=> URL.revokeObjectURL(url), 2000);
+}
+
+/* ====== Compartir por WhatsApp ====== */
+async function shareWhatsapp(optionalBlob){
+  const blob = optionalBlob || await buildPdfBlob();
+  const file = new File([blob], reportName()+'.pdf', { type:'application/pdf' });
+
+  if (navigator.canShare && navigator.canShare({ files:[file] })){
+    await navigator.share({
+      files:[file],
+      title:'Reporte de Arranque',
+      text:`Adjunto reporte del ciclo ${state.cycle}.`
+    });
+  } else {
+    // Fallback desktop / navegadores sin Web Share Level 2:
+    downloadBlob(blob, reportName()+'.pdf');
+    const msg = `Adjunto reporte del ciclo ${state.cycle}.`;
+    const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
+    window.open(url, '_blank'); // el usuario adjunta el PDF descargado
+    alert('Tu navegador no permite adjuntar el PDF directamente a WhatsApp.\nSe descargó el archivo y se abrió WhatsApp con el mensaje. Adjuntá el PDF manualmente.');
+  }
+}
+
+/* ====== Arranque ====== */
+loadLocal();
+render();
+</script>
+</body>
+</html>
