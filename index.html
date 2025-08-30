@@ -186,6 +186,8 @@ hr.sep{border:none;border-top:1px dashed #334155;margin:16px 0}
 
 #btnPdf, #btnShare { display:none !important; }
 
+
+
 </style>
 </head>
 <body>
@@ -235,10 +237,25 @@ hr.sep{border:none;border-top:1px dashed #334155;margin:16px 0}
   </section>
 
   <section>
-    <h3>Timeline del ciclo</h3>
-    <div class="chartbox"><canvas id="chartCycle" height="260"></canvas></div>
-  </section>
+  <h3>Timeline del ciclo</h3>
+  <div class="chart-toolbar">
+    <button id="zoomOut" class="btn ghost" title="Alejar">–</button>
+    <button id="zoomIn"  class="btn ghost" title="Acercar">+</button>
+    <button id="btnFull" class="btn" title="Pantalla completa">Pantalla completa</button>
+    <select id="chartType" class="btn" title="Cambiar vista del gráfico">
+  <option value="timeline" selected>Timeline (barras flotantes)</option>
+  <option value="barras">Barras por tarea</option>
+  <option value="linea">Línea escalonada (hitos)</option>
+  <option value="burbujas">Burbujas (duración)</option>
+</select>
+
+  </div>
+  <div class="chartbox"><canvas id="chartCycle" height="260"></canvas></div>
+</section>
+
 </main>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
 <script>
 /* ====== Pasos ====== */
